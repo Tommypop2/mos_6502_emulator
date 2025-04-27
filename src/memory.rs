@@ -34,6 +34,9 @@ impl Memory {
     pub fn read_byte(&self, addr: u16) -> u8 {
         self.0[addr as usize]
     }
+		pub fn mut_byte(&mut self, addr: u16) -> &mut u8 {
+			&mut self.0[addr as usize]
+		}
     pub fn read_bytes(&self, addr: u16, number: u16) -> &[u8] {
         &self.0[(addr as usize)..((addr + number) as usize)]
     }

@@ -1,13 +1,7 @@
 use std::fs;
 
-use memory::Memory;
-use processor::Processor;
+use emulator::{memory::Memory, processor::Processor};
 
-pub mod addressing;
-pub mod flags;
-pub mod instructions;
-pub mod memory;
-pub mod processor;
 fn main() {
     let program_bytes = fs::read("./simple.bin").unwrap();
     let mut memory = Memory::new();
@@ -17,5 +11,5 @@ fn main() {
     while processor.peek_byte_at_pc() != 0 {
         processor.process_next_instruction();
     }
-		println!("{:#X?}", processor);
+    println!("{:#X?}", processor);
 }

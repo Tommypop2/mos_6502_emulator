@@ -1,9 +1,8 @@
+; loop beq loop
 pc = 4096                 .org $1000
 
-1000 : A9 23              lda #$23
-1002 : 8D 0F 10           sta $100F
+1000 : A2 06              LDX #$06
 
-1005 : A9 24              lda #$24
+1002 : CA                 loop dex
 
-1007 : 6D 0F 10           ADC $100F
-100A : 8D 10 10           sta $1010
+1003 : D0 FD              		 bne loop

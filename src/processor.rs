@@ -1,9 +1,17 @@
 use std::fmt::Debug;
 
-use crate::{addressing::AddressingMode, flags::Flags, instructions::Instruction, memory::Memory};
+use crate::{
+    addressing::AddressingMode,
+    flags::Flags,
+    instructions::{
+        ConditionalBranchInstruction, Group1Instruction, Group2Instruction, Group3Instruction,
+        Instruction, SingleByteInstruction,
+    },
+    memory::Memory,
+};
 #[derive(Debug)]
 pub struct Processor {
-    memory: Memory,
+    pub memory: Memory,
     // Registers
     a: u8, // Accumulator
     x: u8,
@@ -31,6 +39,14 @@ impl Processor {
             pc: 0x1000,
         }
     }
+    pub fn add_to_pc(&mut self, num: i8) {
+        let abs = num.unsigned_abs();
+        if num < 0 {
+            self.pc -= abs as u16
+        } else {
+            self.pc += abs as u16
+        }
+    }
     pub fn peek_byte_at_pc(&self) -> u8 {
         self.memory.read_byte(self.pc)
     }
@@ -41,7 +57,12 @@ impl Processor {
     }
     /// Fetches the "destination" for the instruction.
     /// It is returned as a mutable reference to where the data is located (not yet but planned)
-    pub fn fetch_address(&mut self, addressing_mode: AddressingMode) -> u16 {
+    pub fn fetch_address(&mut self, addressing_mode: Option<AddressingMode>) -> u16 {
+        let addressing_mode = if let Some(a) = addressing_mode {
+            a
+        } else {
+            return u16::MAX;
+        };
         match addressing_mode {
             AddressingMode::Immediate => {
                 // PC is already at byte immediate mode needs
@@ -59,104 +80,224 @@ impl Processor {
                 let address = byte1 + (byte2 << 8);
                 address
             }
+            AddressingMode::Relative => {
+                let offset = self.take_byte_at_pc() as i8 as u16;
+                self.pc.wrapping_add(offset)
+            }
+            AddressingMode::Implicit => {
+                // Will panic if this access is attempted
+                u16::MAX
+            }
+            AddressingMode::Accumulator => u16::MAX,
             _ => {
-                unimplemented!()
+                unimplemented!("Addressing mode {:?} isn't implemented", addressing_mode)
             }
         }
     }
     pub fn process_next_instruction(&mut self) {
         let value = self.take_byte_at_pc();
         let instruction = Instruction::from(value);
-        let addressing_mode = AddressingMode::from(value);
+        let addressing_mode = AddressingMode::try_from((value, instruction)).ok();
         dbg!(&instruction, &addressing_mode);
         let addr = self.fetch_address(addressing_mode);
         // Not sure if incrementing pc before processing the instruction can cause issues.
         // It's mostly so the JMP instruction can set the PC properly
-        self.pc += 1;
         match instruction {
-            // Load instructions
-            Instruction::LDA => {
-                // Load data into accumulator
-                self.a = self.memory.read_byte(addr)
+            Instruction::GroupOne(instruction) => {
+                match instruction {
+                    Group1Instruction::ORA => self.a |= self.memory.read_byte(addr),
+                    Group1Instruction::AND => self.a &= self.memory.read_byte(addr),
+                    Group1Instruction::EOR => self.a ^= self.memory.read_byte(addr),
+                    Group1Instruction::ADC => {
+                        let data = self.memory.read_byte(addr);
+                        let bit7_initial = (data & 0b10000000) != 0;
+                        let (res, overflowed) = self.a.overflowing_add(data);
+                        let bit7_result = (res & 0b10000000) != 0;
+                        // If the result and initial seventh bits aren't the same, then a signed overflow has occured
+                        if bit7_initial != bit7_result {
+                            self.p.set_overflow_flag();
+                        } else {
+                            self.p.clear_overflow_flag();
+                        }
+                        if overflowed {
+                            self.p.set_carry_flag();
+                        } else {
+                            self.p.clear_carry_flag();
+                        }
+                        // Negative value is this is true
+                        if bit7_result {
+                            self.p.set_negative_flag();
+                        } else {
+                            self.p.clear_negative_flag();
+                        }
+                        self.a = res;
+                    }
+                    Group1Instruction::STA => self.memory.write_byte(addr, self.a),
+                    Group1Instruction::LDA => {
+                        // Load data into accumulator
+                        self.a = self.memory.read_byte(addr)
+                    }
+                    Group1Instruction::CMP => {
+                        let res = self.a.wrapping_sub(self.memory.read_byte(addr));
+                        let is_negative = (res & 0b10000000) != 0;
+                        if is_negative {
+                            self.p.set_negative_flag();
+                        } else {
+                            self.p.clear_negative_flag();
+                        }
+                        if res == 0 {
+                            self.p.set_zero_flag();
+                        } else {
+                            self.p.clear_zero_flag();
+                        }
+                        if !is_negative && res != 0 {
+                            self.p.set_carry_flag();
+                        } else {
+                            self.p.clear_carry_flag();
+                        }
+                    }
+                    Group1Instruction::SBC => todo!(),
+                }
+                self.pc += 1;
             }
-            Instruction::LDX => self.x = self.memory.read_byte(addr),
-            Instruction::LDY => self.y = self.memory.read_byte(addr),
-
-            Instruction::STA => self.memory.write_byte(addr, self.a),
-            // Jump
-            Instruction::JMP => self.pc = addr,
-            Instruction::BCC => {
-                if !self.p.get_carry_flag() {
-                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+            Instruction::GroupTwo(instruction) => {
+                match instruction {
+                    Group2Instruction::ASL => {
+                        let data = self.memory.read_byte(addr);
+                        // Get bit 7
+                        let bit7 = (data & 0b10000000) != 0;
+                        if bit7 {
+                            self.p.set_carry_flag();
+                        } else {
+                            self.p.clear_carry_flag();
+                        }
+                        // Write the result, but with bit 0 set to 0
+                        let result = (data << 1) & 0b11111110;
+                        // Get bit 7 of the result
+                        let bit7 = (data & 0b10000000) != 0;
+                        if bit7 {
+                            self.p.set_negative_flag();
+                        } else {
+                            self.p.clear_negative_flag();
+                        }
+                        self.memory.write_byte(addr, result);
+                    }
+                    Group2Instruction::ROL => todo!(),
+                    Group2Instruction::LSR => todo!(),
+                    Group2Instruction::ROR => todo!(),
+                    Group2Instruction::STX => todo!(),
+                    Group2Instruction::LDX => self.x = self.memory.read_byte(addr),
+                    Group2Instruction::DEC => todo!(),
+                    Group2Instruction::INC => todo!(),
                 }
+                self.pc += 1;
             }
-            Instruction::BCS => {
-                if self.p.get_carry_flag() {
-                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+            Instruction::GroupThree(instruction) => {
+                match instruction {
+                    Group3Instruction::BIT => todo!(),
+                    Group3Instruction::JMP => self.pc = addr,
+                    Group3Instruction::JMPABS => todo!(),
+                    Group3Instruction::STY => todo!(),
+                    Group3Instruction::LDY => self.y = self.memory.read_byte(addr),
+                    Group3Instruction::CPY => todo!(),
+                    Group3Instruction::CPX => {
+                        let res = self.x.wrapping_sub(self.memory.read_byte(addr));
+                        let is_negative = (res & 0b10000000) != 0;
+                        if is_negative {
+                            self.p.set_negative_flag();
+                        } else {
+                            self.p.clear_negative_flag();
+                        }
+                        if res == 0 {
+                            self.p.set_zero_flag();
+                        } else {
+                            self.p.clear_zero_flag();
+                        }
+                        if !is_negative && res != 0 {
+                            self.p.set_carry_flag();
+                        } else {
+                            self.p.clear_carry_flag();
+                        }
+                    }
                 }
+                self.pc += 1;
             }
-            Instruction::BEQ => {
-                if self.p.get_zero_flag() {
-                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+            Instruction::ConditionalBranch(instruction) => {
+                match instruction {
+                    ConditionalBranchInstruction::BPL => todo!(),
+                    ConditionalBranchInstruction::BMI => {
+                        if self.p.get_negative_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
+                    ConditionalBranchInstruction::BVC => todo!(),
+                    ConditionalBranchInstruction::BVS => todo!(),
+                    ConditionalBranchInstruction::BCC => {
+                        if !self.p.get_carry_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
+                    ConditionalBranchInstruction::BCS => {
+                        if self.p.get_carry_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
+                    ConditionalBranchInstruction::BNE => {
+                        if !self.p.get_zero_flag() {
+                            dbg!("Branched!");
+														self.pc = addr;
+                            // self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
+                    ConditionalBranchInstruction::BEQ => {
+                        if self.p.get_zero_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
                 }
+                // self.pc += 2;
+								println!("0x{:X}", &self.pc);
             }
-            Instruction::BMI => {
-                if self.p.get_negative_flag() {
-                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+            Instruction::SingleByte(instruction) => match instruction {
+                SingleByteInstruction::BRK => todo!(),
+                SingleByteInstruction::JSRABS => todo!(),
+                SingleByteInstruction::RTI => todo!(),
+                SingleByteInstruction::RTS => todo!(),
+                SingleByteInstruction::PHP => todo!(),
+                SingleByteInstruction::PLP => todo!(),
+                SingleByteInstruction::PHA => todo!(),
+                SingleByteInstruction::PLA => todo!(),
+                SingleByteInstruction::DEY => todo!(),
+                SingleByteInstruction::TAY => todo!(),
+                SingleByteInstruction::INY => todo!(),
+                SingleByteInstruction::INX => todo!(),
+                SingleByteInstruction::CLC => todo!(),
+                SingleByteInstruction::SEC => todo!(),
+                SingleByteInstruction::CLI => todo!(),
+                SingleByteInstruction::SEI => todo!(),
+                SingleByteInstruction::TYA => todo!(),
+                SingleByteInstruction::CLV => todo!(),
+                SingleByteInstruction::CLD => todo!(),
+                SingleByteInstruction::SED => todo!(),
+                SingleByteInstruction::TXA => todo!(),
+                SingleByteInstruction::TXS => todo!(),
+                SingleByteInstruction::TAX => todo!(),
+                SingleByteInstruction::TSX => todo!(),
+                SingleByteInstruction::DEX => {
+                    self.x -= 1;
+                    if self.x == 0 {
+                        self.p.set_zero_flag();
+                    } else {
+                        self.p.clear_zero_flag();
+                    }
+                    if (self.x & 0b10000000) != 0 {
+                        self.p.set_negative_flag();
+                    } else {
+                        self.p.clear_negative_flag();
+                    }
                 }
-            }
-            Instruction::BNE => {
-                if !self.p.get_zero_flag() {
-                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
-                }
-            }
-            // Arithmetic
-            Instruction::ADC => {
-                let data = self.memory.read_byte(addr);
-                let bit7_initial = (data & 0b10000000) != 0;
-                let (res, overflowed) = self.a.overflowing_add(data);
-                let bit7_result = (res & 0b10000000) != 0;
-                // If the result and initial seventh bits aren't the same, then a signed overflow has occured
-                if bit7_initial != bit7_result {
-                    self.p.set_overflow_flag();
-                } else {
-                    self.p.clear_overflow_flag();
-                }
-                if overflowed {
-                    self.p.set_carry_flag();
-                } else {
-                    self.p.clear_carry_flag();
-                }
-                // Negative value is this is true
-                if bit7_result {
-                    self.p.set_negative_flag();
-                } else {
-                    self.p.clear_negative_flag();
-                }
-                self.a = res;
-            }
-
-            Instruction::ASL => {
-                let data = self.memory.read_byte(addr);
-                // Get bit 7
-                let bit7 = (data & 0b10000000) != 0;
-                if bit7 {
-                    self.p.set_carry_flag();
-                } else {
-                    self.p.clear_carry_flag();
-                }
-                // Write the result, but with bit 0 set to 0
-                let result = (data << 1) & 0b11111110;
-                // Get bit 7 of the result
-                let bit7 = (data & 0b10000000) != 0;
-                if bit7 {
-                    self.p.set_negative_flag();
-                } else {
-                    self.p.clear_negative_flag();
-                }
-                self.memory.write_byte(addr, result);
-            }
-            _ => {}
+                SingleByteInstruction::NOP => self.pc += 1,
+            },
         }
     }
 }
@@ -166,7 +307,7 @@ mod tests {
     use super::*;
     #[test]
     fn loading_and_storing() {
-        let bin = include_bytes!("../tests/loading_and_storing/test.bin");
+        let bin = include_bytes!("../tests/fixtures/loading_and_storing/test.bin");
         let mut memory = Memory::new();
         memory.write_bytes(0x1000, bin);
         let mut processor = Processor::new(memory);
@@ -183,7 +324,7 @@ mod tests {
 
     #[test]
     fn unsigned_addition() {
-        let bin = include_bytes!("../tests/unsigned_addition/test.bin");
+        let bin = include_bytes!("../tests/fixtures/unsigned_addition/test.bin");
         let mut memory = Memory::new();
         memory.write_bytes(0x1000, bin);
         let mut processor = Processor::new(memory);

@@ -2,5 +2,10 @@
 name = "mos_6502_emulator"
 version = "0.1.0"
 edition = "2024"
+[lib]
+name = "emulator"
 
 [dependencies]
+
+[dev-dependencies]
+testing = "9.0.0"

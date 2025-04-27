@@ -1,9 +1,7 @@
+; loop beq loop
 .org $1000
 
-lda #$23
-sta $100F
+LDX #$06
 
-lda #$24
-
-ADC $100F
-sta $1010
+loop dex
+		 bne loop
