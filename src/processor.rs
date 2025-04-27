@@ -13,7 +13,10 @@ pub struct Processor {
     s: u8,   // Stack pointer
     pc: u16, // Program counter
 }
-
+fn interpret_as_signed(v: u8) -> i8 {
+    // Safe as we're converting a u8 into an i8, which is always valid
+    unsafe { std::mem::transmute(v) }
+}
 impl Processor {
     /// Initialises a new `Processor` in its RESET state
     pub fn new(memory: Memory) -> Processor {
@@ -80,25 +83,55 @@ impl Processor {
             Instruction::LDY => self.y = self.memory.read_byte(addr),
 
             Instruction::STA => self.memory.write_byte(addr, self.a),
-
+            // Jump
             Instruction::JMP => self.pc = addr,
-
+            Instruction::BCC => {
+                if !self.p.get_carry_flag() {
+                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+                }
+            }
+            Instruction::BCS => {
+                if self.p.get_carry_flag() {
+                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+                }
+            }
+            Instruction::BEQ => {
+                if self.p.get_zero_flag() {
+                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+                }
+            }
+            Instruction::BMI => {
+                if self.p.get_negative_flag() {
+                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+                }
+            }
+            Instruction::BNE => {
+                if !self.p.get_zero_flag() {
+                    self.pc += (2i8 + interpret_as_signed(self.memory.read_byte(addr))) as u16
+                }
+            }
+            // Arithmetic
             Instruction::ADC => {
                 let data = self.memory.read_byte(addr);
-								let bit7_initial = (data & 0b10000000) != 0;
+                let bit7_initial = (data & 0b10000000) != 0;
                 let (res, overflowed) = self.a.overflowing_add(data);
-								let bit7_result = (res & 0b10000000) != 0;
-								// If the result and initial seventh bits aren't the same, then a signed overflow has occured
-								if bit7_initial != bit7_result {
-									self.p.set_overflow_flag();
-								}
-								else {
-									self.p.clear_overflow_flag();
-								}
+                let bit7_result = (res & 0b10000000) != 0;
+                // If the result and initial seventh bits aren't the same, then a signed overflow has occured
+                if bit7_initial != bit7_result {
+                    self.p.set_overflow_flag();
+                } else {
+                    self.p.clear_overflow_flag();
+                }
                 if overflowed {
                     self.p.set_carry_flag();
                 } else {
                     self.p.clear_carry_flag();
+                }
+                // Negative value is this is true
+                if bit7_result {
+                    self.p.set_negative_flag();
+                } else {
+                    self.p.clear_negative_flag();
                 }
                 self.a = res;
             }
@@ -146,5 +179,23 @@ mod tests {
             processor.memory.read_byte(0x1000),
             processor.memory.read_byte(0x100D)
         );
+    }
+
+    #[test]
+    fn unsigned_addition() {
+        let bin = include_bytes!("../tests/unsigned_addition/test.bin");
+        let mut memory = Memory::new();
+        memory.write_bytes(0x1000, bin);
+        let mut processor = Processor::new(memory);
+        // Using 0 byte for program termination for now (which corresponds to the BRK instruction)
+        while processor.peek_byte_at_pc() != 0 {
+            processor.process_next_instruction();
+        }
+
+        println!("{:#X?}", processor);
+        assert_eq!(
+            processor.memory.read_byte(0x1015) + processor.memory.read_byte(0x1016),
+            processor.memory.read_byte(0x1017)
+        )
     }
 }
