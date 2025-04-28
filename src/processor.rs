@@ -100,8 +100,7 @@ impl Processor {
         let addressing_mode = AddressingMode::try_from((value, instruction)).ok();
         dbg!(&instruction, &addressing_mode);
         let addr = self.fetch_address(addressing_mode);
-        // Not sure if incrementing pc before processing the instruction can cause issues.
-        // It's mostly so the JMP instruction can set the PC properly
+
         match instruction {
             Instruction::GroupOne(instruction) => {
                 match instruction {
@@ -245,7 +244,7 @@ impl Processor {
                     ConditionalBranchInstruction::BNE => {
                         if !self.p.get_zero_flag() {
                             dbg!("Branched!");
-														self.pc = addr;
+                            self.pc = addr;
                             // self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
                         }
                     }
@@ -256,7 +255,7 @@ impl Processor {
                     }
                 }
                 // self.pc += 2;
-								println!("0x{:X}", &self.pc);
+                println!("0x{:X}", &self.pc);
             }
             Instruction::SingleByte(instruction) => match instruction {
                 SingleByteInstruction::BRK => todo!(),
