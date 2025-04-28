@@ -204,19 +204,28 @@ impl Processor {
                     Group2Instruction::ROL => todo!(),
                     Group2Instruction::LSR => todo!(),
                     Group2Instruction::ROR => todo!(),
-                    Group2Instruction::STX => todo!(),
+                    Group2Instruction::STX => self.memory.write_byte(addr, self.x),
                     Group2Instruction::LDX => self.x = self.memory.read_byte(addr),
-                    Group2Instruction::DEC => todo!(),
-                    Group2Instruction::INC => todo!(),
+                    Group2Instruction::DEC => {
+                        self.a = self.a.wrapping_sub(1);
+                        self.update_zero_and_negative_flags(self.a);
+                    }
+                    Group2Instruction::INC => {
+                        let byte = self.memory.read_byte(addr) + 1;
+                        self.memory.write_byte(addr, byte);
+                        self.update_zero_and_negative_flags(byte);
+                    }
                 }
                 self.pc += 1;
             }
             Instruction::GroupThree(instruction) => {
                 match instruction {
                     Group3Instruction::BIT => todo!(),
-                    Group3Instruction::JMP => self.pc = addr,
-                    Group3Instruction::JMPABS => todo!(),
-                    Group3Instruction::STY => todo!(),
+                    Group3Instruction::JMP => {
+                        // Kinda hacky, so increment at the end of this `match` sets PC to addr
+                        self.pc = addr - 1
+                    }
+                    Group3Instruction::STY => self.memory.write_byte(addr, self.y),
                     Group3Instruction::LDY => self.y = self.memory.read_byte(addr),
                     Group3Instruction::CPY => todo!(),
                     Group3Instruction::CPX => {
