@@ -1,0 +1,16 @@
+pc = 4096                 .org $1000
+
+; Computes the fib number double this + 1 (so Fib(13))
+1000 : A2 06              LDX #$06
+
+1002 : A9 00              LDA #$00
+1004 : 8D 00 15           STA $1500   ; 1st number
+1007 : A9 01              LDA #$01
+1009 : 8D 01 15           STA $1501   ; 2nd number
+100C : CA                 loop dex
+100D : AD 00 15           		 LDA $1500  ; Load first number into accumulator and sum with 2nd
+1010 : 6D 01 15           		 ADC $1501
+1013 : 8D 00 15           		 STA $1500  ; Store it with the first number
+1016 : 6D 01 15           		 ADC $1501  ; Add 2nd number to first number
+1019 : 8D 01 15           		 STA $1501  ; Store 2nd
+101C : D0 EE              		 bne loop

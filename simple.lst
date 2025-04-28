@@ -1,8 +1,0 @@
-; loop beq loop
-pc = 4096                 .org $1000
-
-1000 : A2 06              LDX #$06
-
-1002 : CA                 loop dex
-
-1003 : D0 FD              		 bne loop

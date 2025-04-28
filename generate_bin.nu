@@ -1,2 +1,2 @@
-python assembler\asm6502.py simple.asm
-objcopy -I ihex simple.hex -O binary simple.bin
+python assembler\asm6502.py test.asm
+objcopy -I ihex test.hex -O binary test.bin
