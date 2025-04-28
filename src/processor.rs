@@ -220,7 +220,26 @@ impl Processor {
             }
             Instruction::GroupThree(instruction) => {
                 match instruction {
-                    Group3Instruction::BIT => todo!(),
+                    Group3Instruction::BIT => {
+                        let byte = self.memory.read_byte(addr);
+                        if (byte & self.a) == 0 {
+                            self.p.set_zero_flag();
+                        } else {
+                            self.p.clear_zero_flag();
+                        }
+                        let bit7 = byte & 0b10000000;
+                        let bit6 = byte & 0b01000000;
+                        if bit7 == 0 {
+                            self.p.clear_negative_flag();
+                        } else {
+                            self.p.set_negative_flag();
+                        }
+                        if bit6 == 0 {
+                            self.p.clear_overflow_flag();
+                        } else {
+                            self.p.set_overflow_flag();
+                        }
+                    }
                     Group3Instruction::JMP => {
                         // Kinda hacky, so increment at the end of this `match` sets PC to addr
                         self.pc = addr - 1
@@ -252,14 +271,26 @@ impl Processor {
             }
             Instruction::ConditionalBranch(instruction) => {
                 match instruction {
-                    ConditionalBranchInstruction::BPL => todo!(),
+                    ConditionalBranchInstruction::BPL => {
+                        if !self.p.get_negative_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
                     ConditionalBranchInstruction::BMI => {
                         if self.p.get_negative_flag() {
                             self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
                         }
                     }
-                    ConditionalBranchInstruction::BVC => todo!(),
-                    ConditionalBranchInstruction::BVS => todo!(),
+                    ConditionalBranchInstruction::BVC => {
+                        if !self.p.get_overflow_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
+                    ConditionalBranchInstruction::BVS => {
+                        if self.p.get_overflow_flag() {
+                            self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
+                        }
+                    }
                     ConditionalBranchInstruction::BCC => {
                         if !self.p.get_carry_flag() {
                             self.add_to_pc(interpret_as_signed(self.memory.read_byte(addr)));
@@ -308,21 +339,42 @@ impl Processor {
                     let byte2 = self.pop_from_stack();
                     self.pc = ((byte1 as u16) << 8) + byte2 as u16 + 1
                 }
-                SingleByteInstruction::DEY => todo!(),
-                SingleByteInstruction::TAY => todo!(),
-                SingleByteInstruction::INY => todo!(),
-                SingleByteInstruction::INX => todo!(),
-                SingleByteInstruction::CLC => todo!(),
-                SingleByteInstruction::SEC => todo!(),
-                SingleByteInstruction::CLI => todo!(),
-                SingleByteInstruction::SEI => todo!(),
-                SingleByteInstruction::TYA => todo!(),
-                SingleByteInstruction::CLV => todo!(),
-                SingleByteInstruction::CLD => todo!(),
-                SingleByteInstruction::SED => todo!(),
-                SingleByteInstruction::TXA => todo!(),
+                SingleByteInstruction::DEY => {
+                    self.y = self.y.wrapping_sub(1);
+                    self.update_zero_and_negative_flags(self.y);
+                }
+                SingleByteInstruction::TAY => {
+                    self.y = self.a;
+                    self.update_zero_and_negative_flags(self.y);
+                }
+                SingleByteInstruction::INY => {
+                    self.y = self.y.wrapping_add(1);
+                    self.update_zero_and_negative_flags(self.y);
+                }
+                SingleByteInstruction::INX => {
+                    self.x = self.x.wrapping_add(1);
+                    self.update_zero_and_negative_flags(self.x);
+                }
+                SingleByteInstruction::CLC => self.p.clear_carry_flag(),
+                SingleByteInstruction::SEC => self.p.set_carry_flag(),
+                SingleByteInstruction::CLI => self.p.clear_interrupt_disable_flag(),
+                SingleByteInstruction::SEI => self.p.set_interrupt_disable_flag(),
+                SingleByteInstruction::TYA => {
+                    self.a = self.y;
+                    self.update_zero_and_negative_flags(self.a);
+                }
+                SingleByteInstruction::CLV => self.p.clear_overflow_flag(),
+                SingleByteInstruction::CLD => self.p.clear_decimal_mode_flag(),
+                SingleByteInstruction::SED => self.p.set_decimal_mode_flag(),
+                SingleByteInstruction::TXA => {
+                    self.a = self.x;
+                    self.update_zero_and_negative_flags(self.a);
+                }
 
-                SingleByteInstruction::TAX => todo!(),
+                SingleByteInstruction::TAX => {
+                    self.x = self.a;
+                    self.update_zero_and_negative_flags(self.x);
+                }
 
                 SingleByteInstruction::DEX => {
                     self.x -= 1;
