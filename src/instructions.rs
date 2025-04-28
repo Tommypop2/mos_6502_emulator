@@ -51,7 +51,6 @@ pub enum SingleByteInstruction {
     // Other single byte instructions
     // Interrupt and subroutine
     BRK,
-    JSRABS,
     RTI,
     RTS,
 
@@ -78,6 +77,12 @@ pub enum SingleByteInstruction {
     DEX,
     NOP,
 }
+// Feels slightly overkill to have this separate group for a single instruction, but it doesn't fit the pattern anywhere else
+#[derive(Clone, Copy, Debug)]
+pub enum SpecialCase {
+    // Apparently "only absolute-addressing instruction that doesn't fit the aaabbbcc"
+    JSRABS,
+}
 #[derive(Debug, Copy, Clone)]
 pub enum Instruction {
     GroupOne(Group1Instruction),
@@ -85,6 +90,7 @@ pub enum Instruction {
     GroupThree(Group3Instruction),
     ConditionalBranch(ConditionalBranchInstruction),
     SingleByte(SingleByteInstruction),
+    SpecialCase(SpecialCase),
 }
 // Parse instructions that don't follow aaabbbcc rule
 fn parse_conditional_branch_instruction(opcode: u8) -> Option<ConditionalBranchInstruction> {
@@ -103,10 +109,16 @@ fn parse_conditional_branch_instruction(opcode: u8) -> Option<ConditionalBranchI
     }
     None
 }
+fn parse_special_case(opcode: u8) -> Option<SpecialCase> {
+    if opcode == 0x20 {
+        Some(SpecialCase::JSRABS)
+    } else {
+        None
+    }
+}
 fn parse_other_single_byte_instruction(opcode: u8) -> Option<SingleByteInstruction> {
     match opcode {
         0x00 => Some(SingleByteInstruction::BRK),
-        0x20 => Some(SingleByteInstruction::JSRABS),
         0x40 => Some(SingleByteInstruction::RTI),
         0x60 => Some(SingleByteInstruction::RTS),
 
@@ -140,6 +152,9 @@ fn parse_other_single_byte_instruction(opcode: u8) -> Option<SingleByteInstructi
 fn parse_single_byte_instruction(opcode: u8) -> Option<Instruction> {
     if let Some(conditional_branch) = parse_conditional_branch_instruction(opcode) {
         return Some(Instruction::ConditionalBranch(conditional_branch));
+    }
+    if let Some(special_case) = parse_special_case(opcode) {
+        return Some(Instruction::SpecialCase(special_case));
     }
     // Check for other single byte instructions
     parse_other_single_byte_instruction(opcode).map(|i| Instruction::SingleByte(i))

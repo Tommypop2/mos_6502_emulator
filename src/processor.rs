@@ -5,7 +5,7 @@ use crate::{
     flags::Flags,
     instructions::{
         ConditionalBranchInstruction, Group1Instruction, Group2Instruction, Group3Instruction,
-        Instruction, SingleByteInstruction,
+        Instruction, SingleByteInstruction, SpecialCase,
     },
     memory::Memory,
 };
@@ -282,7 +282,6 @@ impl Processor {
                 SingleByteInstruction::TSX => self.x = self.s,
 
                 SingleByteInstruction::BRK => todo!(),
-                SingleByteInstruction::JSRABS => todo!(),
                 SingleByteInstruction::RTI => todo!(),
                 SingleByteInstruction::RTS => todo!(),
                 SingleByteInstruction::DEY => todo!(),
@@ -315,6 +314,9 @@ impl Processor {
                     }
                 }
                 SingleByteInstruction::NOP => self.pc += 1,
+            },
+            Instruction::SpecialCase(instruction) => match instruction {
+                SpecialCase::JSRABS => {}
             },
         }
     }

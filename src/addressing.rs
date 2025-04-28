@@ -1,4 +1,4 @@
-use crate::instructions::Instruction;
+use crate::instructions::{Instruction, SpecialCase};
 
 #[derive(Debug)]
 pub enum AddressingMode {
@@ -28,6 +28,7 @@ impl TryFrom<OpCodeInstructionPair> for AddressingMode {
         // Handle special cases (instructions which cannot be handled entirely by group)
         match instruction {
             Instruction::ConditionalBranch(_) => return Ok(Self::Relative),
+            Instruction::SpecialCase(SpecialCase::JSRABS) => return Ok(Self::Absolute),
             _ => {}
         }
         // Return an error if it's a single byte instruction
