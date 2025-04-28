@@ -34,7 +34,7 @@ impl Processor {
             x: 0,
             y: 0,
             p: Flags::new(),
-            s: 0x00FD,
+            s: 0x00FF,
             // A bit after the zero page and stack
             pc: 0x1000,
         }
@@ -46,6 +46,15 @@ impl Processor {
         } else {
             self.pc += abs as u16
         }
+    }
+    pub fn push_to_stack(&mut self, byte: u8) {
+        self.memory.write_byte(self.s as u16, byte);
+        self.s = self.s.wrapping_sub(1);
+    }
+    pub fn pop_from_stack(&mut self) -> u8 {
+        let byte = self.memory.read_byte(self.s as u16);
+        self.s = self.s.wrapping_add(1);
+        byte
     }
     pub fn peek_byte_at_pc(&self) -> u8 {
         self.memory.read_byte(self.pc)
@@ -258,14 +267,24 @@ impl Processor {
                 println!("0x{:X}", &self.pc);
             }
             Instruction::SingleByte(instruction) => match instruction {
+                // Stack Operations
+                // Push processor status onto stack
+                SingleByteInstruction::PHP => self.push_to_stack(*self.p.raw()),
+                // Pull processor status from stack
+                SingleByteInstruction::PLP => *self.p.raw_mut() = self.pop_from_stack(),
+                // Push accumulator onto stack
+                SingleByteInstruction::PHA => self.push_to_stack(self.a),
+                // Pull accumulator from stack
+                SingleByteInstruction::PLA => self.a = self.pop_from_stack(),
+                // Transfer X to stack pointer
+                SingleByteInstruction::TXS => self.s = self.x,
+                // Transfer stack pointer to X
+                SingleByteInstruction::TSX => self.x = self.s,
+
                 SingleByteInstruction::BRK => todo!(),
                 SingleByteInstruction::JSRABS => todo!(),
                 SingleByteInstruction::RTI => todo!(),
                 SingleByteInstruction::RTS => todo!(),
-                SingleByteInstruction::PHP => todo!(),
-                SingleByteInstruction::PLP => todo!(),
-                SingleByteInstruction::PHA => todo!(),
-                SingleByteInstruction::PLA => todo!(),
                 SingleByteInstruction::DEY => todo!(),
                 SingleByteInstruction::TAY => todo!(),
                 SingleByteInstruction::INY => todo!(),
@@ -279,9 +298,9 @@ impl Processor {
                 SingleByteInstruction::CLD => todo!(),
                 SingleByteInstruction::SED => todo!(),
                 SingleByteInstruction::TXA => todo!(),
-                SingleByteInstruction::TXS => todo!(),
+
                 SingleByteInstruction::TAX => todo!(),
-                SingleByteInstruction::TSX => todo!(),
+
                 SingleByteInstruction::DEX => {
                     self.x -= 1;
                     if self.x == 0 {
