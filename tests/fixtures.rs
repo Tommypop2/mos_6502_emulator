@@ -19,8 +19,11 @@ fn fixture_tests(input: PathBuf) {
     if !expected_memory_path.exists() {
         let bytes = processor.memory.read_bytes(start_region, num_bytes_to_read);
         fs::write(expected_memory_path, bytes).unwrap();
-				return;
+        return;
     }
-		let expected_bytes = fs::read(expected_memory_path).unwrap();
-		assert_eq!(expected_bytes, processor.memory.read_bytes(start_region, num_bytes_to_read))
+    let expected_bytes = fs::read(expected_memory_path).unwrap();
+    assert_eq!(
+        expected_bytes,
+        processor.memory.read_bytes(start_region, num_bytes_to_read)
+    )
 }

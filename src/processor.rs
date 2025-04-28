@@ -86,8 +86,8 @@ impl Processor {
                 self.pc += 1;
                 let byte2 = self.peek_byte_at_pc() as u16;
 
-                let address = byte1 + (byte2 << 8);
-                address
+                
+                byte1 + (byte2 << 8)
             }
             AddressingMode::Relative => {
                 let offset = self.take_byte_at_pc() as i8 as u16;

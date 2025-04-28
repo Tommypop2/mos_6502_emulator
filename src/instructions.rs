@@ -157,7 +157,7 @@ fn parse_single_byte_instruction(opcode: u8) -> Option<Instruction> {
         return Some(Instruction::SpecialCase(special_case));
     }
     // Check for other single byte instructions
-    parse_other_single_byte_instruction(opcode).map(|i| Instruction::SingleByte(i))
+    parse_other_single_byte_instruction(opcode).map(Instruction::SingleByte)
 }
 impl From<u8> for Instruction {
     fn from(opcode: u8) -> Self {

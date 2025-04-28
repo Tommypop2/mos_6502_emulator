@@ -9,6 +9,12 @@ impl Debug for Flags {
 }
 pub struct Flags(u8);
 
+impl Default for Flags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Flags {
     pub fn new() -> Self {
         // This bit is initialised to 1 apparently: https://www.nesdev.org/wiki/Status_flags
@@ -100,10 +106,10 @@ mod tests {
     fn carry_flag() {
         let mut flags = Flags::new();
         flags.set_carry_flag();
-        assert_eq!(flags.get_carry_flag(), true);
+        assert!(flags.get_carry_flag());
         assert_eq!(flags.0, 0b00100001);
         flags.clear_carry_flag();
-        assert_eq!(flags.get_carry_flag(), false);
+        assert!(!flags.get_carry_flag());
         assert_eq!(flags.0, 0b00100000);
     }
 

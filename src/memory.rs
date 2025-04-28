@@ -18,6 +18,12 @@ impl Debug for Memory {
 }
 pub struct Memory([u8; MEMORY_SIZE]);
 
+impl Default for Memory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Memory {
     /// Create new `Memory`, initialised to 0
     pub fn new() -> Self {
@@ -34,9 +40,9 @@ impl Memory {
     pub fn read_byte(&self, addr: u16) -> u8 {
         self.0[addr as usize]
     }
-		pub fn mut_byte(&mut self, addr: u16) -> &mut u8 {
-			&mut self.0[addr as usize]
-		}
+    pub fn mut_byte(&mut self, addr: u16) -> &mut u8 {
+        &mut self.0[addr as usize]
+    }
     pub fn read_bytes(&self, addr: u16, number: u16) -> &[u8] {
         &self.0[(addr as usize)..((addr + number) as usize)]
     }
