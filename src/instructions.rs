@@ -1,5 +1,5 @@
 // Instructions are grouped as shown on https://llx.com/Neil/a2/opcodes.html
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Group1Instruction {
     // Group One
     ORA,
@@ -11,7 +11,7 @@ pub enum Group1Instruction {
     CMP,
     SBC,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Group2Instruction {
     // Group Two
     ASL,
@@ -23,7 +23,7 @@ pub enum Group2Instruction {
     DEC,
     INC,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Group3Instruction {
     // Group Three
     BIT,
@@ -34,7 +34,7 @@ pub enum Group3Instruction {
     CPY,
     CPX,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ConditionalBranchInstruction {
     // Conditional Branches
     BPL,
@@ -46,7 +46,7 @@ pub enum ConditionalBranchInstruction {
     BNE,
     BEQ,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SingleByteInstruction {
     // Other single byte instructions
     // Interrupt and subroutine
@@ -78,12 +78,12 @@ pub enum SingleByteInstruction {
     NOP,
 }
 // Feels slightly overkill to have this separate group for a single instruction, but it doesn't fit the pattern anywhere else
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SpecialCase {
     // Apparently "only absolute-addressing instruction that doesn't fit the aaabbbcc"
     JSRABS,
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Instruction {
     GroupOne(Group1Instruction),
     GroupTwo(Group2Instruction),
@@ -202,5 +202,42 @@ impl From<u8> for Instruction {
             }),
             _ => panic!("Unsupported instruction, opcode ${:x}", opcode),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn test_instruction(opcodes: &[u8], instruction: Instruction) {
+        for code in opcodes {
+            assert_eq!(Instruction::from(*code), instruction)
+        }
+    }
+    // Check that a few instructions are what we expect
+    #[test]
+    fn lda() {
+        let opcodes = [0xA9, 0xA5, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1];
+        test_instruction(&opcodes, Instruction::GroupOne(Group1Instruction::LDA));
+    }
+
+    #[test]
+    fn cpx() {
+        let opcodes = [0xE0, 0xE4, 0xEC];
+        test_instruction(&opcodes, Instruction::GroupThree(Group3Instruction::CPX));
+    }
+
+    #[test]
+    fn tay() {
+        let opcodes = [0xA8];
+        test_instruction(
+            &opcodes,
+            Instruction::SingleByte(SingleByteInstruction::TAY),
+        );
+    }
+
+    #[test]
+    fn jsr_abs() {
+        let opcodes = [0x20];
+        test_instruction(&opcodes, Instruction::SpecialCase(SpecialCase::JSRABS));
     }
 }
