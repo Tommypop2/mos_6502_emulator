@@ -64,6 +64,18 @@ impl Processor {
         self.pc += 1;
         data
     }
+    pub fn update_zero_and_negative_flags(&mut self, value: u8) {
+        if value == 0 {
+            self.p.set_zero_flag();
+        } else {
+            self.p.clear_zero_flag();
+        }
+        if (value & 0b10000000) != 0 {
+            self.p.set_negative_flag();
+        } else {
+            self.p.clear_negative_flag();
+        }
+    }
     /// Fetches the "destination" for the instruction.
     /// It is returned as a mutable reference to where the data is located (not yet but planned)
     pub fn fetch_address(&mut self, addressing_mode: Option<AddressingMode>) -> u16 {
@@ -305,16 +317,7 @@ impl Processor {
 
                 SingleByteInstruction::DEX => {
                     self.x -= 1;
-                    if self.x == 0 {
-                        self.p.set_zero_flag();
-                    } else {
-                        self.p.clear_zero_flag();
-                    }
-                    if (self.x & 0b10000000) != 0 {
-                        self.p.set_negative_flag();
-                    } else {
-                        self.p.clear_negative_flag();
-                    }
+                    self.update_zero_and_negative_flags(self.x);
                 }
                 SingleByteInstruction::NOP => self.pc += 1,
             },
