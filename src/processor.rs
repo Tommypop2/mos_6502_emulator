@@ -86,7 +86,6 @@ impl Processor {
                 self.pc += 1;
                 let byte2 = self.peek_byte_at_pc() as u16;
 
-                
                 byte1 + (byte2 << 8)
             }
             AddressingMode::Relative => {
@@ -283,7 +282,11 @@ impl Processor {
 
                 SingleByteInstruction::BRK => todo!(),
                 SingleByteInstruction::RTI => todo!(),
-                SingleByteInstruction::RTS => todo!(),
+                SingleByteInstruction::RTS => {
+                    let byte1 = self.pop_from_stack();
+                    let byte2 = self.pop_from_stack();
+                    self.pc = ((byte1 as u16) << 8) + byte2 as u16 + 1
+                }
                 SingleByteInstruction::DEY => todo!(),
                 SingleByteInstruction::TAY => todo!(),
                 SingleByteInstruction::INY => todo!(),
@@ -316,7 +319,12 @@ impl Processor {
                 SingleByteInstruction::NOP => self.pc += 1,
             },
             Instruction::SpecialCase(instruction) => match instruction {
-                SpecialCase::JSRABS => {}
+                SpecialCase::JSRABS => {
+                    // PC is already address (minus one) of return, as PC has been incremented by parsing address that JSR is acting on
+                    let [byte1, byte2] = self.pc.to_le_bytes();
+                    self.push_to_stack(byte1);
+                    self.push_to_stack(byte2);
+                }
             },
         }
     }
