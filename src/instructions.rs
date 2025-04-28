@@ -28,7 +28,7 @@ pub enum Group3Instruction {
     // Group Three
     BIT,
     JMP,
-    JMPABS,
+    // JMPABS,
     STY,
     LDY,
     CPY,
@@ -193,7 +193,7 @@ impl From<u8> for Instruction {
             0b00 => Instruction::GroupThree(match aaa {
                 0b001 => Group3Instruction::BIT,
                 0b010 => Group3Instruction::JMP,
-                0b011 => Group3Instruction::JMPABS,
+                // 0b011 => Group3Instruction::JMPABS,
                 0b100 => Group3Instruction::STY,
                 0b101 => Group3Instruction::LDY,
                 0b110 => Group3Instruction::CPY,
