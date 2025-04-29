@@ -130,7 +130,13 @@ impl Processor {
                     Group1Instruction::ADC => {
                         let data = self.memory.read_byte(addr);
                         let bit7_initial = (data & 0b10000000) != 0;
-                        let (res, overflowed) = self.a.overflowing_add(data);
+                        let (res1, overflowed_1) = self.a.overflowing_add(data);
+                        // Add carry flag and check for overflow again
+                        // Add separately, as data + 1 could overflow too
+                        let (res, overflowed_2) =
+                            res1.overflowing_add(if self.p.get_carry_flag() { 1 } else { 0 });
+                        let overflowed = overflowed_1 | overflowed_2;
+
                         let bit7_result = (res & 0b10000000) != 0;
                         // If the result and initial seventh bits aren't the same, then a signed overflow has occured
                         if bit7_initial != bit7_result {
@@ -143,7 +149,7 @@ impl Processor {
                         } else {
                             self.p.clear_carry_flag();
                         }
-                        // Negative value is this is true
+                        // Negative value if this is true
                         if bit7_result {
                             self.p.set_negative_flag();
                         } else {
