@@ -332,8 +332,26 @@ impl Processor {
                 // Transfer stack pointer to X
                 SingleByteInstruction::TSX => self.x = self.s,
 
-                SingleByteInstruction::BRK => todo!(),
-                SingleByteInstruction::RTI => todo!(),
+                SingleByteInstruction::BRK => {
+                    let [byte1, byte2] = (self.pc + 2).to_le_bytes();
+                    self.push_to_stack(byte1);
+                    self.push_to_stack(byte2);
+                    // Set break command flag only for pushing to stack
+                    self.p.set_break_command_flag();
+                    self.push_to_stack(*self.p.raw());
+                    self.p.clear_break_command_flag();
+                    self.pc = 0xFFFE;
+                }
+                SingleByteInstruction::RTI => {
+                    let flags = self.pop_from_stack();
+                    *self.p.raw_mut() = flags;
+                    // Pushed flags had break command, which shouldn't be restored, so it's cleared here
+                    self.p.clear_break_command_flag();
+                    // Pull PC
+                    let byte1 = self.pop_from_stack();
+                    let byte2 = self.pop_from_stack();
+                    self.pc = ((byte1 as u16) << 8) + byte2 as u16
+                }
                 SingleByteInstruction::RTS => {
                     let byte1 = self.pop_from_stack();
                     let byte2 = self.pop_from_stack();
